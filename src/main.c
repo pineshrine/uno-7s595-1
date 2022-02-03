@@ -150,7 +150,7 @@ int main(void)
         for (int i = 0; i < 10000; i++)
         {
             display_quad7seg(i);
-            _delay_ms(10);
+            _delay_us(10);
         }
     }
 
