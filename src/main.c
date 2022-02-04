@@ -4,7 +4,9 @@
  */
 
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include <util/delay.h>
+#include <stdio.h>
 
 const int map7seg[10][8] =
 {
@@ -21,7 +23,7 @@ const int map7seg[10][8] =
 
 };
 
-void dr_595(int d1_value, int d2_value, int d3_value, int d4_value)
+void dr_595(unsigned int d1_value, unsigned int d2_value, unsigned int d3_value, unsigned int d4_value)
 {
     //disable cathode pins
     PORTD &= ~((1<<PORTD2)|(1<<PORTD3)|(1<<PORTD4)|(1<<PORTD5));
@@ -122,7 +124,7 @@ void dr_595(int d1_value, int d2_value, int d3_value, int d4_value)
 
 }
 
-void display_quad7seg(int dis_value)
+void display_quad7seg(unsigned int dis_value)
 {
     int d1 = dis_value / 1000;
     dis_value %= 1000;
@@ -138,6 +140,20 @@ void display_quad7seg(int dis_value)
     }
 }
 
+void send_char(unsigned char data)
+{
+	while(!(UCSR0A & (1<<UDRE0)));
+    UDR0 = data;
+}
+
+void send_msg(unsigned char *str)
+{
+    while (*str != '\0')
+    {
+        send_char(*str++);
+    }
+}
+
 int main(void)
 {
     // HC595 drive
@@ -145,12 +161,21 @@ int main(void)
     //7seg cathode
     DDRD |= ((1<<DDD2)|(1<<DDD3)|(1<<DDD4)|(1<<DDD5));
 
+    //usart configuration for terminal monitor
+    UBRR0 = ((F_CPU/(16UL*9600UL))-1); //9600 is BAUD, magic word
+    UCSR0A = UCSR0B = UCSR0C = 0; // clear all registers
+    UCSR0B |= ((1<<TXEN0)|(1<<RXEN0));
+    UCSR0C |= ((1<<UCSZ01)|(1<<UCSZ00)); 
+
     while (1)
     {
         for (int i = 0; i < 10000; i++)
         {
             display_quad7seg(i);
             _delay_us(10);
+            char *buf[128];
+            sprintf(buf,"%d ",i);
+            send_msg(buf);
         }
     }
 
