@@ -8,7 +8,7 @@
 #include <util/delay.h>
 #include <stdio.h>
 
-const int map7seg[10][8] =
+const int map7seg[11][8] =
 {
     {0,0,1,1,1,1,1,1},
     {0,0,0,0,0,1,1,0},
@@ -19,14 +19,14 @@ const int map7seg[10][8] =
     {0,1,1,1,1,1,0,1},
     {0,0,0,0,0,1,1,1},
     {0,1,1,1,1,1,1,1},
-    {0,1,1,0,1,1,1,1}
-
+    {0,1,1,0,1,1,1,1},
+    {0,0,0,0,0,0,1,1}
 };
 
-void dr_595(unsigned int d1_value, unsigned int d2_value, unsigned int d3_value, unsigned int d4_value)
+void dr_595(unsigned int d1_value, unsigned int d2_value, unsigned int d3_value, unsigned int d4_value, unsigned int colon)
 {
     //disable cathode pins
-    PORTD &= ~((1<<PORTD2)|(1<<PORTD3)|(1<<PORTD4)|(1<<PORTD5));
+    PORTD &= ~((1<<PORTD2)|(1<<PORTD3)|(1<<PORTD4)|(1<<PORTD5)|(1<<PORTD6));
 
     //seems to be silly but hardcode for 1st try
     //drive 595 for anode pins
@@ -120,6 +120,32 @@ void dr_595(unsigned int d1_value, unsigned int d2_value, unsigned int d3_value,
     PORTB &= ~(1<<PORTB2);
     //d4 on
     PORTD |= (1<<PORTD5);
+
+    //colon
+    for (int i = 0; i < 8; i++)
+    {
+        //find 0or1 bit of inputted num
+        if (map7seg[10][i] == 0)
+        {
+            PORTB |= (1<<PORTB0);
+        } else if (map7seg[10][i] == 1)
+        {
+            PORTB &= ~(1<<PORTB0);
+        }
+        //send a clock
+        PORTB |= (1<<PORTB1);
+        PORTB &= ~(1<<PORTB1);
+    }
+    //d4 off
+    PORTD &= ~(1<<PORTD5);
+    //send a latch
+    PORTB |= (1<<PORTB2);
+    PORTB &= ~(1<<PORTB2);
+    //d6 blink
+    if (colon == 1)
+    {
+        PORTD |= (1<<PORTD6);
+    }
     _delay_us(10);
 
 }
@@ -136,7 +162,11 @@ void display_quad7seg(unsigned int dis_value)
     
     for (int i = 0; i < 1000; i++)
     {
-        dr_595(d1,d2,d3,d4);
+        dr_595(d1,d2,d3,d4,1);
+    }
+    for (int i = 0; i < 1000; i++)
+    {
+        dr_595(d1,d2,d3,d4,0);
     }
 }
 
@@ -159,7 +189,7 @@ int main(void)
     // HC595 drive
     DDRB |= ((1<<DDB0)|(1<<DDB1)|(1<<DDB2));
     //7seg cathode
-    DDRD |= ((1<<DDD2)|(1<<DDD3)|(1<<DDD4)|(1<<DDD5));
+    DDRD |= ((1<<DDD2)|(1<<DDD3)|(1<<DDD4)|(1<<DDD5)|(1<<DDD6));
 
     //usart configuration for terminal monitor
     UBRR0 = ((F_CPU/(16UL*9600UL))-1); //9600 is BAUD, magic word
