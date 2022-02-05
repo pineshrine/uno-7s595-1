@@ -25,6 +25,7 @@ const int map7seg[11][8] =
 
 void dr_595(unsigned int d1_value, unsigned int d2_value, unsigned int d3_value, unsigned int d4_value, unsigned int colon)
 {
+    cli();
     //disable cathode pins
     PORTD &= ~((1<<PORTD2)|(1<<PORTD3)|(1<<PORTD4)|(1<<PORTD5)|(1<<PORTD6));
 
@@ -146,7 +147,7 @@ void dr_595(unsigned int d1_value, unsigned int d2_value, unsigned int d3_value,
     {
         PORTD |= (1<<PORTD6);
     }
-    _delay_us(10);
+    sei();
 
 }
 
@@ -176,12 +177,34 @@ void send_char(unsigned char data)
     UDR0 = data;
 }
 
+//send msg without cr or lf
 void send_msg(unsigned char *str)
 {
     while (*str != '\0')
     {
         send_char(*str++);
     }
+}
+
+//send line with CR before start 
+void send_msg_r(unsigned char *str)
+{
+    send_char(13);
+    while (*str != '\0')
+    {
+        send_char(*str++);
+    }
+}
+
+//send msg with crlf.
+void send_msg_n(unsigned char *str)
+{
+    while (*str != '\0')
+    {
+        send_char(*str++);
+    }
+    send_char(10);
+    send_char(13);
 }
 
 int main(void)
@@ -197,15 +220,18 @@ int main(void)
     UCSR0B |= ((1<<TXEN0)|(1<<RXEN0));
     UCSR0C |= ((1<<UCSZ01)|(1<<UCSZ00)); 
 
+    char *buf[128];
+    sprintf(buf,"%s","started.");
+    send_msg_n(buf);
+
     while (1)
     {
         for (int i = 0; i < 10000; i++)
         {
             display_quad7seg(i);
             _delay_us(10);
-            char *buf[128];
             sprintf(buf,"%d ",i);
-            send_msg(buf);
+            send_msg_r(buf);
         }
     }
 
