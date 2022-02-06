@@ -324,6 +324,7 @@ int main(void)
 
     sprintf(buf,"%s","started. input HHMMSS:");
     send_msg_n(buf);
+    sei();
 
     while (1)
     {
