@@ -25,7 +25,7 @@ miscs
 
 however, this project uses arduino bootloader (I think it's still there), and avr-gcc libraries.
 
-yeah, `NIH syndrome<https://en.wikipedia.org/wiki/Not_invented_here>` is a bad thing mate! follow the UNIX philosophy.
+yeah, NIH syndrome<https://en.wikipedia.org/wiki/Not_invented_here> is a bad thing mate! follow the UNIX philosophy.
 
 this is just a my hobby project and not intended for actual use anyway.
 
@@ -36,9 +36,14 @@ what's the ingredients?
 --------
 
 * Arduino Uno (ofcource compatible from China one)
-* 4 digit 7 segment LED, OSL40391-IG
+* 4 digit 7 segment LED, OSL40391-IG <https://akizukidenshi.com/download/ds/optosupply/OSL40391-XX.PDF>
 * 74HC595
 * Resistance 2k oam x 5 (not armed one)
+
+circuit design
+--------
+
+.. image:: uno-7s595-1.jpg
 
 known issue
 ========
