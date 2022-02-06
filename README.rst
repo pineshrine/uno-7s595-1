@@ -15,16 +15,17 @@ Arduino Uno 7seg digital clock by pure c language example
 what this project aims to?
 ========
 
-* no uses arduino language
+* no uses arduino language, use just pure c, then I'm feel like a /macho/ person
 * no uses fancy libraries
-* do your bare-hands!
+* do by your bare-hands!
 * then I can learn what's happened down the in the MIKROCOMPUTERS!
 
 miscs
 --------
 
 however, this project uses arduino bootloader (I think it's still there), and avr-gcc libraries.
-yeah, NIH syndrome is a bad thing mate!
+
+yeah, `NIH syndrome<https://en.wikipedia.org/wiki/Not_invented_here>` is a bad thing mate! follow the UNIX philosophy.
 
 this is just a my hobby project and not intended for actual use anyway.
 
@@ -39,11 +40,16 @@ what's the ingredients?
 * 74HC595
 * Resistance 2k oam x 5 (not armed one)
 
+known issue
+========
+
+* time is not accurate (ouch!)
+
 Who's auther?
 ========
 
 Matsu
-twitter @pineshrine
+twitter @pineshrine<https://twitter.com/pineshrine>
 
 original document follows below:
 
