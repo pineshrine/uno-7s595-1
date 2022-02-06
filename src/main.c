@@ -26,21 +26,23 @@ const int map7seg[11][8] =
     {0,0,0,0,0,0,1,1}
 };
 
-struct time_time
+volatile struct time_time
 {
     int hour;
     int minute;
     int second;
+    int msecond;
 };
 
-struct time_time time_timer;
+volatile struct time_time time_timer;
 
+volatile int start_flg = 0;
 
 volatile unsigned char input[8];
 volatile unsigned char input_length;
 
 void dr_595(unsigned int d1_value, unsigned int d2_value, unsigned int d3_value, unsigned int d4_value, unsigned int colon);
-void display_quad7seg(unsigned int dis_value);
+void display_quad7seg_time(int dot);
 void send_char(unsigned char data);
 void send_msg(unsigned char *str);
 void send_msg_r(unsigned char *str);
@@ -176,24 +178,16 @@ void dr_595(unsigned int d1_value, unsigned int d2_value, unsigned int d3_value,
 }
 
 //display 4 digits value on OSL40391-IG quad7seg-led array via dr_595 func
-void display_quad7seg(unsigned int dis_value)
+void display_quad7seg_time(int dot)
 {
-    int d1 = dis_value / 1000;
-    dis_value %= 1000;
-    int d2 = dis_value / 100;
-    dis_value %= 100; 
-    int d3 = dis_value / 10;
-    dis_value %= 10;
-    int d4 = dis_value;
-    
-    for (int i = 0; i < 1000; i++)
-    {
-        dr_595(d1,d2,d3,d4,1);
-    }
-    for (int i = 0; i < 1000; i++)
-    {
-        dr_595(d1,d2,d3,d4,0);
-    }
+        int d1 = time_timer.hour / 10;
+        int d2 = time_timer.hour % 10;
+        int d3 = time_timer.minute /10;
+        int d4 = time_timer.minute %10;
+        for (int i = 0; i < 100; i++)
+        {
+            dr_595(d1,d2,d3,d4,dot);
+        }
 }
 
 //send atomic char to usart(arduino uno way)
@@ -235,6 +229,7 @@ void send_msg_n(unsigned char *str)
 
 ISR(USART_RX_vect)
 {
+    //cli();
     unsigned char buf = UDR0;
     if (buf != '\n')
     {
@@ -264,7 +259,39 @@ ISR(USART_RX_vect)
         sprintf(ret,"se:%d",time_timer.second);
         send_msg_n(ret);
 
+        //flag on
+        start_flg = 1;
+
+        //reset buffer pointer
         input_length = 0;
+
+        //disable rx
+        UCSR0B &= ~((1<<RXEN0)|(1<<RXCIE0));
+    }
+    //sei();
+}
+
+ISR(TIMER0_COMPA_vect)
+{
+    if (++time_timer.msecond >= 60)
+    {
+        time_timer.msecond = 0;
+        time_timer.second++;
+    }
+    if (time_timer.second >= 60)
+    {
+        time_timer.second = 0;
+        time_timer.minute++;
+        
+    }
+    if(time_timer.minute >= 60)
+    {
+        time_timer.minute = 0;
+        time_timer.hour++;
+    }
+    if (time_timer.hour >= 24)
+    {
+        time_timer.hour = 0;
     }
 }
 
@@ -281,15 +308,41 @@ int main(void)
     UCSR0B |= ((1<<TXEN0)|(1<<RXEN0)|(1<<RXCIE0)); // enable tx,rx,rx interrupt
     UCSR0C |= ((1<<UCSZ01)|(1<<UCSZ00)); 
 
-    //timer configuration for clock intr
-    //WIP
+    //timer0 configuration for clock intr
+    TCNT0 = 0; //init timer0
+    TCCR0A |= (1<<WGM01); // CTC type
+    TCCR0B |= ((1<<CS02)|(1<<CS00)); //1024 divide, thus 1ms is 250
+    OCR0A = 250-1; // set timer0 compare register A
+    TIMSK0 |= (1<<OCIE0A); //set timer0 intr mask reg to compare match A
 
     char *buf[128];
+
+    time_timer.hour = 0;
+    time_timer.minute = 0;
+    time_timer.second = 0;
+    time_timer.msecond = 0;
 
     sprintf(buf,"%s","started. input HHMMSS:");
     send_msg_n(buf);
 
+    while (1)
+    {
+        if (start_flg != 0)
+        {
+            sprintf(buf,"%d ",time_timer.second);
+            send_msg_r(buf);
+        }
+        if ((time_timer.second % 2) > 0)
+        {
+            display_quad7seg_time(1);
+        } else
+        {
+            display_quad7seg_time(0);
+        }
+    }
+    
 
+/*
     while (1)
     {
         for (int i = 0; i < 10000; i++)
@@ -300,6 +353,7 @@ int main(void)
             //send_msg_r(buf);
         }
     }
-
+    **
+*/
     return 0;
 }
