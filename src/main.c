@@ -6,10 +6,10 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <util/delay.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <util/delay.h>
 
 const int map7seg[11][8] =
 {
@@ -34,19 +34,26 @@ volatile struct time_time
     int msecond;
 };
 
-volatile struct time_time time_timer;
+volatile struct time_time time_timer ={0,0,0,0};
 
 volatile int start_flg = 0;
+volatile configure_start = 0;
+volatile int mode_flg = 0;
+volatile int cfg_digit = 0;
+volatile int c00 = 0;
+volatile int c01 = 0;
 
 volatile unsigned char input[8];
 volatile unsigned char input_length;
 
 void dr_595(unsigned int d1_value, unsigned int d2_value, unsigned int d3_value, unsigned int d4_value, unsigned int colon);
+void dr595_spec(int value,int digit);
 void display_quad7seg_time(int dot);
 void send_char(unsigned char data);
 void send_msg(unsigned char *str);
 void send_msg_r(unsigned char *str);
 void send_msg_n(unsigned char *str);
+void input_logic(void);
 
 //intended for drive 74HC595
 void dr_595(unsigned int d1_value, unsigned int d2_value, unsigned int d3_value, unsigned int d4_value, unsigned int colon)
@@ -177,6 +184,47 @@ void dr_595(unsigned int d1_value, unsigned int d2_value, unsigned int d3_value,
 
 }
 
+/**
+void dr595_spec(int value,int digit)
+{
+    //
+    PORTD &= ~((1<<PORTD2)|(1<<PORTD3)|(1<<PORTD4)|(1<<PORTD5)|(1<<PORTD6));
+    switch (digit)
+    {
+        //hh
+    case 1:
+        PORTD |= (1<<PORTD2);
+        break;
+    case 2:
+        PORTD |= (1<<PORTD3);
+        break;
+        //mm
+    case 3:
+        PORTD |= (1<<PORTD4);
+        break;
+    case 4:
+        PORTD |= (1<<PORTD5);
+        break;
+    default:
+        break;
+    }
+    for (int i = 0; i < 8; i++)
+    {
+        //find 0or1 bit of inputted num
+        if (map7seg[d3_value][i] == 0)
+        {
+            PORTB |= (1<<PORTB0);
+        } else if (map7seg[d3_value][i] == 1)
+        {
+            PORTB &= ~(1<<PORTB0);
+        }
+        //send a clock
+        PORTB |= (1<<PORTB1);
+        PORTB &= ~(1<<PORTB1);
+    }
+}
+**/
+
 //display 4 digits value on OSL40391-IG quad7seg-led array via dr_595 func
 void display_quad7seg_time(int dot)
 {
@@ -225,6 +273,78 @@ void send_msg_n(unsigned char *str)
     }
     send_char(10);
     send_char(13);
+}
+
+void input_logic(void)
+{
+    char *buf[128];
+
+    if (configure_start == 0)
+    {
+        time_timer.hour = 0;
+        time_timer.minute = 0;
+        time_timer.second = 0;
+        time_timer.msecond = 0;
+        mode_flg = 1;
+        configure_start = 1;
+        sprintf(buf,"%s","config start,c00,c01:");
+        send_msg(buf);
+        sprintf(buf,"%d,",c00);
+        send_msg(buf);
+        sprintf(buf,"%d",c01);
+        send_msg_n(buf);
+    }else if ((c00 == 1) && (mode_flg < 2))
+    {
+            mode_flg++;
+            sprintf(buf,"%s","mode++:");
+            send_msg(buf);
+            sprintf(buf,"%d",mode_flg);
+            send_msg_n(buf);
+            c00 = 0;
+    } else if ((c01 == 1) && (mode_flg < 3))
+    {
+        c01 = 0;
+        if (mode_flg == 1)
+        {
+            if (time_timer.hour < 23)
+            {
+                time_timer.hour++;
+                time_timer.second = 0;
+                time_timer.msecond = 0;
+                sprintf(buf,"%s","hour++");
+                send_msg_n(buf);
+            } else {
+                time_timer.hour = 0;
+                time_timer.second = 0;
+                time_timer.msecond = 0;
+                sprintf(buf,"%s","hour = 0");
+                send_msg_n(buf);
+            }
+        } else if (mode_flg == 2)
+        {
+            if (time_timer.minute < 59)
+            {
+                time_timer.minute++;
+                time_timer.second = 0;
+                time_timer.msecond = 0;
+                sprintf(buf,"%s","min++");
+                send_msg_n(buf);
+            } else {
+                time_timer.minute = 0;
+                time_timer.second = 0;
+                time_timer.msecond = 0;
+                sprintf(buf,"%s","min = 0");
+                send_msg_n(buf);
+            }
+        }
+    } else {
+        mode_flg = 0;
+        configure_start = 0;
+        c00 = 0;
+        c01 = 0;
+        sprintf(buf,"%s","config end");
+        send_msg_n(buf);
+    }
 }
 
 ISR(USART_RX_vect)
@@ -295,12 +415,33 @@ ISR(TIMER0_COMPA_vect)
     }
 }
 
+ISR(PCINT1_vect)
+{
+    _delay_ms(10); 
+    c00 = !(PINC & 0x01);
+    c01 = !(PINC & 0x02);
+    PCIFR |= (1<<PCIF1);
+    if ((c00 == 01) || (c01 == 1))
+    {
+        input_logic();
+    }
+}
+
 int main(void)
 {
     // HC595 drive
     DDRB |= ((1<<DDB0)|(1<<DDB1)|(1<<DDB2));
     //7seg cathode
     DDRD |= ((1<<DDD2)|(1<<DDD3)|(1<<DDD4)|(1<<DDD5)|(1<<DDD6));
+    //sw input uses pc0,1 port, avoid pc4,5 for future use(i2c)
+    DDRC &= ~((1<<DDC0)|(1<<DDC1));
+
+    //input pull-up
+    PORTC |= ((1<<PORTC0)|(1<<PORTC1));
+    //allow expernal pin intr INT8-14
+    PCICR |= (1<<PCIE1);
+    //allow intr mask for PCINT7,8 (pc0=pcint8 pc1=pcint9)
+    PCMSK1 |= ((1<<PCINT8)|(1<<PCINT9));
 
     //usart configuration for terminal monitor
     UBRR0 = ((F_CPU/(16UL*9600UL))-1); //9600 is BAUD, magic word
@@ -317,11 +458,6 @@ int main(void)
 
     char *buf[128];
 
-    time_timer.hour = 0;
-    time_timer.minute = 0;
-    time_timer.second = 0;
-    time_timer.msecond = 0;
-
     sprintf(buf,"%s","started. input HHMMSS:");
     send_msg_n(buf);
     sei();
@@ -333,28 +469,17 @@ int main(void)
             sprintf(buf,"%d ",time_timer.second);
             send_msg_r(buf);
         }
-        if ((time_timer.second % 2) > 0)
+        if ((time_timer.second % 2) > 0 && configure_start == 0)
         {
             display_quad7seg_time(1);
+        } else if (configure_start == 0)
+        {
+            display_quad7seg_time(0);
         } else
         {
             display_quad7seg_time(0);
         }
     }
-    
 
-/*
-    while (1)
-    {
-        for (int i = 0; i < 10000; i++)
-        {
-            display_quad7seg(i);
-            _delay_us(10);
-            //sprintf(buf,"%d ",i);
-            //send_msg_r(buf);
-        }
-    }
-    **
-*/
     return 0;
 }
