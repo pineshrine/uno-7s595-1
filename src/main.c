@@ -36,8 +36,8 @@ volatile struct time_time
 
 volatile struct time_time time_timer ={0,0,0,0};
 
-volatile int start_flg = 0;
-volatile configure_start = 0;
+volatile int setting_flg = 0;
+volatile int configure_start = 0;
 volatile int mode_flg = 0;
 volatile int cfg_digit = 0;
 volatile int c00 = 0;
@@ -351,11 +351,16 @@ ISR(USART_RX_vect)
 {
     //cli();
     unsigned char buf = UDR0;
-    if (buf != '\n')
+    if (buf == 0x1A)
+    {
+        setting_flg = 1;
+        return;
+    }
+    if ((buf != '\n') && (setting_flg == 1))
     {
         input[input_length++] = buf;
     }
-    if (input_length >= 7 || buf == '\n')
+    if (((input_length >= 7) || (buf == '\n')) && (setting_flg == 1))
     {
         //a little bit tricky cuz I'm not good to code ^^;
         //there is a more better way
@@ -380,7 +385,7 @@ ISR(USART_RX_vect)
         send_msg_n(ret);
 
         //flag on
-        start_flg = 1;
+        setting_flg = 0;
 
         //reset buffer pointer
         input_length = 0;
@@ -458,13 +463,13 @@ int main(void)
 
     char *buf[128];
 
-    sprintf(buf,"%s","started. input HHMMSS:");
+    sprintf(buf,"%s","started. input ctrl-z then HHMMSS:");
     send_msg_n(buf);
     sei();
 
     while (1)
     {
-        if (start_flg != 0)
+        if (setting_flg == 0)
         {
             sprintf(buf,"%d ",time_timer.second);
             send_msg_r(buf);
