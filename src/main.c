@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <util/delay.h>
+#include <avr/eeprom.h>
 
 const int map7seg[11][8] =
 {
@@ -184,47 +185,6 @@ void dr_595(unsigned int d1_value, unsigned int d2_value, unsigned int d3_value,
 
 }
 
-/**
-void dr595_spec(int value,int digit)
-{
-    //
-    PORTD &= ~((1<<PORTD2)|(1<<PORTD3)|(1<<PORTD4)|(1<<PORTD5)|(1<<PORTD6));
-    switch (digit)
-    {
-        //hh
-    case 1:
-        PORTD |= (1<<PORTD2);
-        break;
-    case 2:
-        PORTD |= (1<<PORTD3);
-        break;
-        //mm
-    case 3:
-        PORTD |= (1<<PORTD4);
-        break;
-    case 4:
-        PORTD |= (1<<PORTD5);
-        break;
-    default:
-        break;
-    }
-    for (int i = 0; i < 8; i++)
-    {
-        //find 0or1 bit of inputted num
-        if (map7seg[d3_value][i] == 0)
-        {
-            PORTB |= (1<<PORTB0);
-        } else if (map7seg[d3_value][i] == 1)
-        {
-            PORTB &= ~(1<<PORTB0);
-        }
-        //send a clock
-        PORTB |= (1<<PORTB1);
-        PORTB &= ~(1<<PORTB1);
-    }
-}
-**/
-
 //display 4 digits value on OSL40391-IG quad7seg-led array via dr_595 func
 void display_quad7seg_time(int dot)
 {
@@ -343,8 +303,23 @@ void input_logic(void)
         c00 = 0;
         c01 = 0;
         sprintf(buf,"%s","config end");
+        eeprom_time_save();
         send_msg_n(buf);
     }
+}
+
+void eeprom_time_save(void)
+{
+    eeprom_busy_wait();
+    eeprom_update_block(&time_timer,0x0000,sizeof(time_timer));
+    send_msg_n("time saved.");
+}
+
+void eeprom_time_read(void)
+{
+    eeprom_busy_wait();
+    eeprom_read_block(&time_timer,0x0000,sizeof(time_timer));
+    send_msg_n("time readed.");
 }
 
 ISR(USART_RX_vect)
@@ -392,6 +367,8 @@ ISR(USART_RX_vect)
 
         //disable rx
         UCSR0B &= ~((1<<RXEN0)|(1<<RXCIE0));
+
+        eeprom_time_save();
     }
     //sei();
 }
@@ -462,6 +439,8 @@ int main(void)
     TIMSK0 |= (1<<OCIE0A); //set timer0 intr mask reg to compare match A
 
     char *buf[128];
+
+    eeprom_time_read();
 
     sprintf(buf,"%s","started. input ctrl-z then HHMMSS:");
     send_msg_n(buf);
