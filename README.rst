@@ -53,7 +53,7 @@ what's the ingredients?
 circuit design
 --------
 
-.. image:: uno-7s595-1.jpg
+.. image:: uno-7s595-2.jpg
 
 known issue
 ========

@@ -48,7 +48,6 @@ volatile unsigned char input[8];
 volatile unsigned char input_length;
 
 void dr_595(unsigned int d1_value, unsigned int d2_value, unsigned int d3_value, unsigned int d4_value, unsigned int colon);
-void dr595_spec(int value,int digit);
 void display_quad7seg_time(int dot);
 void send_char(unsigned char data);
 void send_msg(unsigned char *str);
